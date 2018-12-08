@@ -10,5 +10,3 @@
 * Andrea Cometa <info@andreacometa.it>
 * Andrea Gallina
 * Matteo Bilotta <mbilotta@linkgroup.it>
-* Luigi di Naro <luigidinaro@teuron.it>
-* Alfredo Salata <alfredo.salata@rdsmoulding.com>
