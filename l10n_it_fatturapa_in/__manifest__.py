@@ -18,7 +18,7 @@
     "depends": [
         'l10n_it_fatturapa',
         'l10n_it_withholding_tax_causali',
-        ],
+    ],
     "data": [
         'views/account_view.xml',
         'views/partner_view.xml',
