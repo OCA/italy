@@ -114,6 +114,7 @@ Contributors
 * Alex Comba
 * Sergio Zanchetta <https://github.com/primes2h>
 * Lara Baggio <http://linkgroup.it/>
+* Alessandro Camilli <http://openforce.it/>
 
 Maintainers
 ~~~~~~~~~~~
