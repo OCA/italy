@@ -23,11 +23,13 @@
 #
 
 import math
+from datetime import datetime
 from odoo import models, fields, api
 from odoo.tools.translate import _
 from odoo.exceptions import UserError
 import odoo.addons.decimal_precision as dp
 from odoo.tools import float_is_zero
+from odoo.tools.misc import DEFAULT_SERVER_DATE_FORMAT
 
 
 class AccountVatPeriodEndStatement(models.Model):
@@ -148,6 +150,7 @@ class AccountVatPeriodEndStatement(models.Model):
             'paid': [('readonly', True)],
             'draft': [('readonly', False)]
         }, digits=dp.get_precision('Account'))
+    previous_year_credit = fields.Boolean("Previous year credits")
     previous_debit_vat_account_id = fields.Many2one(
         'account.account', 'Previous Debits VAT',
         help='Debit VAT from previous periods',
@@ -206,7 +209,7 @@ class AccountVatPeriodEndStatement(models.Model):
             'paid': [('readonly', True)],
             'draft': [('readonly', False)]})
     authority_vat_account_id = fields.Many2one(
-        'account.account', 'Tax Authority VAT Account', required=True,
+        'account.account', 'Tax Authority VAT Account',
         states={
             'confirmed': [('readonly', True)],
             'paid': [('readonly', True)],
@@ -272,6 +275,7 @@ class AccountVatPeriodEndStatement(models.Model):
     year_footer = fields.Char(
         string='Year for Footer',
         help="Value printed near number of page in the footer")
+    annual = fields.Boolean("Annual prospect")
 
     @api.multi
     def unlink(self):
@@ -505,8 +509,9 @@ class AccountVatPeriodEndStatement(models.Model):
         for statement in self:
             statement.previous_debit_vat_amount = 0.0
             prev_statements = self.search(
-                [('date', '<', statement.date)], order='date desc')
-            if prev_statements:
+                [('date', '<', statement.date), ('annual', '=', False)],
+                order='date desc')
+            if prev_statements and not statement.annual:
                 prev_statement = prev_statements[0]
                 if (
                     prev_statement.residual > 0 and
@@ -518,6 +523,23 @@ class AccountVatPeriodEndStatement(models.Model):
                     statement.write(
                         {'previous_credit_vat_amount': (
                             - prev_statement.authority_vat_amount)})
+                    company = statement.company_id or self.env.user.company_id
+                    statement_fiscal_year_dates = (
+                        company.compute_fiscalyear_dates(datetime.strptime(
+                            statement.date_range_ids and
+                            statement.date_range_ids[0].date_start or
+                            statement.date, DEFAULT_SERVER_DATE_FORMAT)))
+                    prev_statement_fiscal_year_dates = (
+                        company.compute_fiscalyear_dates(datetime.strptime(
+                            prev_statement.date_range_ids and
+                            prev_statement.date_range_ids[0].date_start or
+                            prev_statement.date, DEFAULT_SERVER_DATE_FORMAT)))
+                    if (
+                        prev_statement_fiscal_year_dates['date_to'] <
+                        statement_fiscal_year_dates['date_from']
+                    ):
+                        statement.write({
+                            'previous_year_credit': True})
 
             credit_line_ids, debit_line_ids = self._get_credit_debit_lines(
                 statement)
