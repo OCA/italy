@@ -46,7 +46,8 @@ from odoo.addons.l10n_it_fatturapa.bindings.fatturapa import (
     DettaglioPagamentoType,
     AllegatiType,
     ScontoMaggiorazioneType,
-    CodiceArticoloType
+    CodiceArticoloType,
+    AltriDatiGestionaliType,
 )
 from odoo.addons.l10n_it_fatturapa.models.account import (
     RELATED_DOCUMENT_TYPES)
@@ -630,7 +631,6 @@ class WizardExportFatturapa(models.TransientModel):
         return res
 
     def setDettaglioLinee(self, invoice, body):
-
         body.DatiBeniServizi = DatiBeniServiziType()
         # TipoCessionePrestazione not handled
 
@@ -649,6 +649,24 @@ class WizardExportFatturapa(models.TransientModel):
                 line_no, line, body, price_precision, uom_precision)
             line_no += 1
 
+        generic_mngt_lines = invoice.related_mngt_data_ids.filtered(
+            lambda x: not x.lineRef)
+        for DettaglioLinea in body.DatiBeniServizi.DettaglioLinee:
+            mngt_lines = filter(
+                lambda x: x.lineRef == DettaglioLinea.NumeroLinea,
+                invoice.related_mngt_data_ids)
+            mngt_lines = mngt_lines or generic_mngt_lines
+            for mngt_line in mngt_lines:
+                dati_gestionali = AltriDatiGestionaliType()
+                dati_gestionali.TipoDato = mngt_line.name
+                if mngt_line.text_ref:
+                    dati_gestionali.RiferimentoTesto = mngt_line.text_ref
+                if mngt_line.number_ref:
+                    dati_gestionali.RiferimentoNumero = '%.2f' % \
+                        mngt_line.number_ref
+                if mngt_line.date_ref:
+                    dati_gestionali.RiferimentoData = mngt_line.date_ref
+                DettaglioLinea.AltriDatiGestionali.append(dati_gestionali)
         return True
 
     def setDettaglioLinea(
@@ -709,6 +727,7 @@ class WizardExportFatturapa(models.TransientModel):
                 )
                 DettaglioLinea.CodiceArticolo.append(CodiceArticolo)
         body.DatiBeniServizi.DettaglioLinee.append(DettaglioLinea)
+
         return True
 
     def setScontoMaggiorazione(self, line):

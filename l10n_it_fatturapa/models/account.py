@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 Davide Corio <davide.corio@abstract.it>
+# Copyright 2018 Gianmarco Conte, Marco Calcagni - Dinamiche Aziendali srl
+# Copyright 2019 Sergio Corato
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
 
 from odoo import fields, models, api
@@ -417,7 +419,27 @@ class AccountInvoice(models.Model):
              "terms of Article 73 of Italian Presidential Decree 633/72 (this "
              "enables the seller/provider to issue in the same year several "
              "documents with same number)", copy=False)
+
     electronic_invoice_subjected = fields.Boolean(
         'Subjected to Electronic Invoice',
         related='commercial_partner_id.electronic_invoice_subjected',
         readonly=True)
+
+    related_mngt_data_ids = fields.One2many(
+        'fatturapa.mngt_data_type', 'invoice_id',
+        'Related management data', copy=False
+    )
+
+
+class FatturapaMngtData(models.Model):
+    _name = 'fatturapa.mngt_data_type'
+    _description = 'FatturaPA Mngt Data Type'
+
+    name = fields.Char('Name', size=10, required=True)
+    lineRef = fields.Integer('Line Ref.')
+    invoice_id = fields.Many2one(
+        'account.invoice', 'Related Invoice',
+        ondelete='cascade', index=True)
+    text_ref = fields.Char('Reference Text', size=60)
+    number_ref = fields.Float('Reference Number')
+    date_ref = fields.Date('Reference Date')
