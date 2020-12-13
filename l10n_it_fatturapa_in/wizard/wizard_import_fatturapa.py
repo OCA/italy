@@ -712,7 +712,7 @@ class WizardImportFatturapa(models.TransientModel):
                         dline.DataDecorrenzaPenale or False,
                     'payment_code':
                         dline.CodicePagamento or '',
-                    'payment_data_id': payment_id
+                    'payment_data_id': payment_id.id
                 }
                 bank = False
                 payment_bank_id = False
@@ -736,12 +736,14 @@ class WizardImportFatturapa(models.TransientModel):
                     else:
                         bank = banks[0]
                 if dline.IBAN:
+                    PaymentDataModel = self.env['fatturapa.payment.data']
                     SearchDom = [
                         (
                             'acc_number', '=',
                             pretty_iban(dline.IBAN.strip())
                         ),
-                        ('partner_id', '=', partner_id),
+                        '|', ('partner_id', '=', partner_id),
+                        ('partner_id', '=', payment_id.invoice_id.company_id.partner_id.id),
                     ]
                     payment_bank_id = False
                     payment_banks = PartnerBankModel.search(SearchDom)
@@ -759,15 +761,17 @@ class WizardImportFatturapa(models.TransientModel):
                             )
                         )
                     elif not payment_banks and bank:
-                        payment_bank_id = PartnerBankModel.create(
-                            {
-                                'acc_number': dline.IBAN.strip(),
-                                'partner_id': partner_id,
-                                'bank_id': bank.id,
-                                'bank_name': dline.IstitutoFinanziario or bank.name,
-                                'bank_bic': dline.BIC or bank.bic
-                            }
-                        ).id
+                        b = PartnerBankModel.search([('acc_number', '=', pretty_iban(dline.IBAN.strip()))])
+                        if not b:
+                            payment_bank_id = PartnerBankModel.create(
+                                {
+                                    'acc_number': dline.IBAN.strip(),
+                                    'partner_id': partner_id,
+                                    'bank_id': bank.id,
+                                    'bank_name': dline.IstitutoFinanziario or bank.name,
+                                    'bank_bic': dline.BIC or bank.bic
+                                }
+                            ).id
                     if payment_banks:
                         payment_bank_id = payment_banks[0].id
 
@@ -1213,7 +1217,7 @@ class WizardImportFatturapa(models.TransientModel):
                         'payment_terms': term_id,
                         'invoice_id': invoice_id
                     }
-                ).id
+                )
                 self._createPaymentsLine(PayDataId, PaymentLine, partner_id)
 
     def set_withholding_tax(self, FatturaBody, invoice_data):
