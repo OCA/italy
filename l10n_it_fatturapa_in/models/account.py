@@ -19,6 +19,7 @@
 ##############################################################################
 
 from openerp.osv import fields, orm
+from openerp.addons import decimal_precision as dp
 
 
 class account_invoice(orm.Model):
@@ -29,7 +30,55 @@ class account_invoice(orm.Model):
             'fatturapa.attachment.in', 'FatturaPA Import File',
             ondelete='restrict'),
         'inconsistencies': fields.text('Import Inconsistencies'),
+        
+        'e_invoice_line_ids': fields.one2many(
+            "einvoice.line", "invoice_id", string="Dettaglio Linee",
+            readonly=True, copy=False),
+    'e_invoice_amount_untaxed': fields.float(
+        string='E-Invoice Untaxed Amount', readonly=True),
+    'e_invoice_amount_tax': fields.float(string='E-Invoice Tax Amount',
+                                           readonly=True),
+    'e_invoice_amount_total': fields.float(string='E-Invoice Total Amount',
+                                             readonly=True),
+
+    'e_invoice_reference': fields.char(
+        string="E-invoice vendor reference",
+        readonly=True),
+
+    'e_invoice_date_invoice': fields.date(
+        string="E-invoice invoice date",
+        readonly=True),
+
+    'e_invoice_validation_error': fields.boolean(
+        compute='_compute_e_invoice_validation_error'),
+
+    'e_invoice_validation_message': fields.text(
+        compute='_compute_e_invoice_validation_error'),
+
+    'e_invoice_force_validation': fields.boolean(
+        string='Force E-Invoice Validation'),
+
+    'e_invoice_received_date': fields.date(
+        string='E-Bill Received Date'),
     }
+
+    def name_get(self, cr, uid, ids, context={}):
+        result = super(account_invoice, self).name_get(cr, uid, ids, context)
+        res = []
+        for tup in result:
+            invoice = self.browse(cr, uid, tup[0])
+            if invoice.type in ('in_invoice', 'in_refund'):
+                name = "%s, %s" % (tup[1], invoice.partner_id.name)
+                if invoice.origin:
+                    name += ', %s' % invoice.origin
+                res.append((invoice.id, name))
+            else:
+                res.append(tup)
+        return res
+
+    def remove_attachment_link(self, cr, uid, ids, context={}):
+        self.write(cr, uid, ids, {'fatturapa_attachment_in_id': False}, context)
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
 
 
 class fatturapa_article_code(orm.Model):
@@ -43,7 +92,7 @@ class fatturapa_article_code(orm.Model):
         'invoice_line_id': fields.many2one(
             'account.invoice.line', 'Related Invoice line',
             ondelete='cascade', select=True
-        )
+        ),
     }
 
 
@@ -72,4 +121,71 @@ class account_invoice_line(orm.Model):
             'discount.rise.price', 'invoice_line_id',
             'Discount and Rise Price Details'
         ),
+        
+        'fatturapa_attachment_in_id': fields.related(
+            'invoice_id', 'fatturapa_attachment_in_id', type='many2one',
+            relation='fatturapa.attachment.in', string='E-Invoice Import File'),
+    }
+
+
+class DiscountRisePrice(orm.Model):
+    _inherit = "discount.rise.price"
+    
+    _columns = {
+        'e_invoice_line_id': fields.many2one(
+            'einvoice.line', 'Related E-Invoice line', readonly=True
+            )
+    }
+
+
+class EInvoiceLine(orm.Model):
+    _name = 'einvoice.line'
+
+    _columns = {
+        'invoice_id': fields.many2one(
+            "account.invoice", "Invoice", readonly=True),
+        'line_number': fields.integer('Numero Linea', readonly=True),
+        'service_type': fields.char('Tipo Cessione Prestazione', readonly=True),
+        'cod_article_ids': fields.one2many(
+            'fatturapa.article.code', 'invoice_line_id',
+            'Cod. Articles', readonly=True
+        ),
+        'name': fields.char("Descrizione", readonly=True),
+        'qty': fields.float(
+            "Quantita'", readonly=True,
+            digits_compute=dp.get_precision('Product Unit of Measure')
+        ),
+        'uom': fields.char("Unita' di misura", readonly=True),
+        'period_start_date': fields.date("Data Inizio Periodo", readonly=True),
+        'period_end_date': fields.date("Data Fine Periodo", readonly=True),
+        'unit_price': fields.float(
+            "Prezzo unitario", readonly=True,
+            digits_compute=dp.get_precision('Product Price')
+        ),
+        'discount_rise_price_ids': fields.one2many(
+            'discount.rise.price', 'e_invoice_line_id',
+            'Discount and Rise Price Details', readonly=True
+        ),
+        'total_price': fields.float("Prezzo Totale", readonly=True),
+        'tax_amount': fields.float("Aliquota IVA", readonly=True),
+        'wt_amount': fields.char("Ritenuta", readonly=True),
+        'tax_kind': fields.char("Natura", readonly=True),
+        'admin_ref': fields.char("Riferimento mministrazione", readonly=True),
+        'other_data_ids': fields.one2many(
+            "einvoice.line.other.data", "e_invoice_line_id",
+            string="Altri dati gestionali", readonly=True),
+    }
+
+
+class EInvoiceLineOtherData(orm.Model):
+    _name = 'einvoice.line.other.data'
+
+    _columns = {
+        'e_invoice_line_id': fields.many2one(
+            'einvoice.line', 'Related E-Invoice line', readonly=True
+        ),
+        'name': fields.char("Tipo Dato", readonly=True),
+        'text_ref': fields.char("Riferimento Testo", readonly=True),
+        'num_ref': fields.float("Riferimento Numero", readonly=True),
+        'date_ref': fields.char("Riferimento Data", readonly=True),
     }

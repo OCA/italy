@@ -2,6 +2,7 @@
 ##############################################################################
 #
 #    Copyright (C) 2014 Davide Corio <davide.corio@lsweb.it>
+#    Copyright (C) 2018 Copyright (C) OmniaSolutions (<http://www.omniasolutions.eu>). All Rights Reserved
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
@@ -18,7 +19,9 @@
 #
 ##############################################################################
 
-from openerp.osv import fields, orm
+from openerp.osv import fields
+from openerp.osv import orm
+
 
 RELATED_DOCUMENT_TYPES = {
     'order': 'DatiOrdineAcquisto',
@@ -32,7 +35,7 @@ RELATED_DOCUMENT_TYPES = {
 class fatturapa_format(orm.Model):
     # _position = ['1.1.3']
     _name = "fatturapa.format"
-    _description = 'FatturaPA Format'
+    _description = 'E-invoice Format'
 
     _columns = {
         'name': fields.char('Description', size=128),
@@ -43,29 +46,7 @@ class fatturapa_format(orm.Model):
 class fatturapa_document_type(orm.Model):
     # _position = ['2.1.1.1']
     _name = "fatturapa.document_type"
-    _description = 'FatturaPA Document Type'
-
-    _columns = {
-        'name': fields.char('Description', size=128),
-        'code': fields.char('Code', size=4),
-    }
-
-
-class fatturapa_payment_term(orm.Model):
-    # _position = ['2.4.1']
-    _name = "fatturapa.payment_term"
-    _description = 'FatturaPA Payment Term'
-
-    _columns = {
-        'name': fields.char('Description', size=128),
-        'code': fields.char('Code', size=4),
-    }
-
-
-class fatturapa_payment_method(orm.Model):
-    # _position = ['2.4.2.2']
-    _name = "fatturapa.payment_method"
-    _description = 'FatturaPA Payment Method'
+    _description = 'E-invoice Document Type'
 
     _columns = {
         'name': fields.char('Description', size=128),
@@ -77,12 +58,12 @@ class fatturapa_payment_method(orm.Model):
 class fatturapa_payment_data(orm.Model):
     # _position = ['2.4.2.2']
     _name = "fatturapa.payment.data"
-    _description = 'FatturaPA Payment Data'
+    _description = 'E-invoice Payment Data'
 
     _columns = {
         #  2.4.1
         'payment_terms': fields.many2one(
-            'fatturapa.payment_term', string="FatturaPA Payment Method"),
+            'fatturapa.payment_term', string="Electronic Invoice Payment Method"),
         #  2.4.2
         'payment_methods': fields.one2many(
             'fatturapa.payment.detail', 'payment_data_id',
@@ -97,19 +78,20 @@ class fatturapa_payment_data(orm.Model):
 class fatturapa_payment_detail(orm.Model):
     # _position = ['2.4.2']
     _name = "fatturapa.payment.detail"
+    _description = "E-invoice payment details"
     _columns = {
         'recipient': fields.char('Recipient', size=200),
         'fatturapa_pm_id': fields.many2one(
-            'fatturapa.payment_method', string="FatturaPA Payment Method"),
+            'fatturapa.payment_method', string="Electronic Invoice Payment Method"),
         'payment_term_start': fields.date('Payment Term Start'),
         'payment_days': fields.integer('Payment Term Days'),
         'payment_due_date': fields.date('Payment due Date'),
         'payment_amount': fields.float('Payment Amount'),
         'post_office_code': fields.char('Post Office Code', size=20),
-        'recepit_name': fields.char("Recepit payment partner contact"),
-        'recepit_surname': fields.char("Recepit payment partner contact"),
-        'recepit_cf': fields.char("Recepit payment partner contact"),
-        'recepit_title': fields.char("Recepit payment partner contact"),
+        'recepit_name': fields.char("Receipt Issuer Name"),
+        'recepit_surname': fields.char("Receipt Issuer Surname"),
+        'recepit_cf': fields.char("Receipt Issuer FC"),
+        'recepit_title': fields.char("Receipt Issuer Title"),
         'payment_bank_name': fields.char("Bank name"),
         'payment_bank_iban': fields.char("IBAN"),
         'payment_bank_abi': fields.char("ABI"),
@@ -125,28 +107,15 @@ class fatturapa_payment_detail(orm.Model):
         'account_move_line_id': fields.many2one(
             'account.move.line', string="Payment Line"),
         'payment_data_id': fields.many2one(
-            'fatturapa.payment.data', 'Related payments Data',
+            'fatturapa.payment.data', 'Related Payments Data',
             ondelete='cascade', select=True),
-    }
-
-
-#  used in fatturaPa export
-class account_payment_term(orm.Model):
-    # _position = ['2.4.2.2']
-    _inherit = 'account.payment.term'
-
-    _columns = {
-        'fatturapa_pt_id': fields.many2one(
-            'fatturapa.payment_term', string="FatturaPA Payment Term"),
-        'fatturapa_pm_id': fields.many2one(
-            'fatturapa.payment_method', string="FatturaPA Payment Method"),
     }
 
 
 class fatturapa_fiscal_position(orm.Model):
     # _position = ['2.1.1.7.7', '2.2.1.14']
     _name = "fatturapa.fiscal_position"
-    _description = 'FatturaPA Fiscal Position'
+    _description = 'Electronic Invoice Fiscal Position'
 
     _columns = {
         'name': fields.char('Description', size=128),
@@ -157,30 +126,63 @@ class fatturapa_fiscal_position(orm.Model):
 class welfare_fund_type(orm.Model):
     # _position = ['2.1.1.7.1']
     _name = "welfare.fund.type"
-    _description = 'welfare fund type'
+    _description = 'Welfare Fund Type'
 
     _columns = {
         'name': fields.char('name'),
         'description': fields.char('description'),
     }
 
+    def name_get(self, cr, uid, ids, context={}):
+        res = []
+        for record in self.browse(cr, uid, ids, context=context):
+            res.append(
+                (record.id, u'[%s] %s' % (record.name, record.description)))
+        return res
+
 
 class welfare_fund_data_line(orm.Model):
     # _position = ['2.1.1.7']
     _name = "welfare.fund.data.line"
-    _description = 'FatturaPA Welfare Fund Data'
+    _description = 'E-invoice Welfare Fund Data'
 
     _columns = {
         'name': fields.many2one(
             'welfare.fund.type', string="Welfare Fund Type"),
+        'kind_id': fields.many2one('account.tax.kind', string="Non taxable nature"),
         'fund_nature': fields.selection([
-            ('N1', 'escluse ex art. 15'),
-            ('N2', 'non soggette'),
-            ('N3', 'non imponibili'),
-            ('N4', 'esenti'),
-            ('N5', 'regime del margine'),
-            ('N6', 'inversione contabile (reverse charge)'),
+        ('N1', 'excluded pursuant to Art. 15'),
+        ('N2', 'not subject'),
+        ('N2.1', 'not subject to VAT under the articles from 7 to '
+                 '7-septies of DPR 633/72'),
+        ('N2.2', 'not subject – other cases'),
+        ('N3', 'not taxable'),
+        ('N3.1', 'not taxable – exportations'),
+        ('N3.2', 'not taxable – intra Community transfers'),
+        ('N3.3', 'not taxable – transfers to San Marino'),
+        ('N3.4', 'not taxable – transactions treated as export supplies'),
+        ('N3.5', 'not taxable – for declaration of intent'),
+        ('N3.6', 'not taxable – other transactions that don’t contribute to the '
+                 'determination of ceiling'),
+        ('N4', 'exempt'),
+        ('N5', 'margin regime'),
+        ('N6', 'reverse charge'),
+        ('N6.1', 'reverse charge – transfer of scrap and of other recyclable '
+                 'materials'),
+        ('N6.2', 'reverse charge – transfer of gold and pure silver'),
+        ('N6.3', 'reverse charge – subcontracting in the construction sector'),
+        ('N6.4', 'reverse charge – transfer of buildings'),
+        ('N6.5', 'reverse charge – transfer of mobile phones'),
+        ('N6.6', 'reverse charge – transfer of electronic products'),
+        ('N6.7', 'reverse  charge – provisions in the construction and related '
+                 'sectors'),
+        ('N6.8', 'reverse charge – transactions in the energy sector'),
+        ('N6.9', 'reverse charge – other cases'),
+        ('N7', 'VAT paid in other EU countries')
         ], string="Non taxable nature"),
+        #TODO: Il campo fund_nature è stato sostiruito con kind_id = fields.Many2one('account.tax.kind', string="Non taxable nature")
+        # Se mettiamo questo campo è necessario decommentarlo dalla vista l10n_it_fatturapa_in/views/account_view.xml
+        # kind_id = fields.Many2one('account.tax.kind', string="Non taxable nature")
         'welfare_rate_tax': fields.float('Welfare Rate tax'),
         'welfare_amount_tax': fields.float('Welfare Amount tax'),
         'welfare_taxable': fields.float('Welfare Taxable'),
@@ -274,7 +276,7 @@ class faturapa_activity_progress(orm.Model):
 class fattura_attachments(orm.Model):
     # _position = ['2.5']
     _name = "fatturapa.attachments"
-    _description = "FatturaPA attachments"
+    _description = "E-invoice attachments"
     _inherits = {'ir.attachment': 'ir_attachment_id'}
 
     _columns = {
@@ -291,7 +293,7 @@ class fattura_attachments(orm.Model):
 class fatturapa_related_ddt(orm.Model):
     # _position = ['2.1.2', '2.2.3', '2.1.4', '2.1.5', '2.1.6']
     _name = 'fatturapa.related_ddt'
-    _description = 'FatturaPA Related DdT'
+    _description = 'E-invoice Related DDT'
 
     _columns = {
         'name': fields.char('DocumentID', size=20, required=True),
@@ -331,6 +333,14 @@ class account_invoice_line(orm.Model):
             'Related DdT'
         ),
         'admin_ref': fields.char('Administration ref.', size=20),
+        
+        
+        
+    'discount_rise_price_ids': fields.one2many(
+        'discount.rise.price', 'invoice_line_id',
+        'Discount or Supplement Price Details', copy=False
+    ),
+    'ftpa_line_number': fields.integer("Line number", readonly=True, copy=False) ,
     }
 
 
@@ -340,14 +350,36 @@ class faturapa_summary_data(orm.Model):
     _columns = {
         'tax_rate': fields.float('Tax Rate'),
         'non_taxable_nature': fields.selection([
-            ('N1', 'escluse ex art. 15'),
-            ('N2', 'non soggette'),
-            ('N3', 'non imponibili'),
-            ('N4', 'esenti'),
-            ('N5', 'regime del margine'),
-            ('N6', 'inversione contabile (reverse charge)'),
-        ], string="Non taxable nature"),
-        'incidental charges': fields.float('Incidental Charges'),
+        ('N1', 'excluded pursuant to Art. 15'),
+        ('N2', 'not subject'),
+        ('N2.1', 'not subject to VAT under the articles from 7 to '
+                 '7-septies of DPR 633/72'),
+        ('N2.2', 'not subject – other cases'),
+        ('N3', 'not taxable'),
+        ('N3.1', 'not taxable – exportations'),
+        ('N3.2', 'not taxable – intra Community transfers'),
+        ('N3.3', 'not taxable – transfers to San Marino'),
+        ('N3.4', 'not taxable – transactions treated as export supplies'),
+        ('N3.5', 'not taxable – for declaration of intent'),
+        ('N3.6', 'not taxable – other transactions that don’t contribute to the '
+                 'determination of ceiling'),
+        ('N4', 'exempt'),
+        ('N5', 'margin regime'),
+        ('N6', 'reverse charge'),
+        ('N6.1', 'reverse charge – transfer of scrap and of other recyclable '
+                 'materials'),
+        ('N6.2', 'reverse charge – transfer of gold and pure silver'),
+        ('N6.3', 'reverse charge – subcontracting in the construction sector'),
+        ('N6.4', 'reverse charge – transfer of buildings'),
+        ('N6.5', 'reverse charge – transfer of mobile phones'),
+        ('N6.6', 'reverse charge – transfer of electronic products'),
+        ('N6.7', 'reverse  charge – provisions in the construction and related '
+                 'sectors'),
+        ('N6.8', 'reverse charge – transactions in the energy sector'),
+        ('N6.9', 'reverse charge – other cases'),
+        ('N7', 'VAT paid in other EU countries'),
+    ], string="Non taxable nature"),
+        'incidental_charges': fields.float('Incidental Charges'),
         'rounding': fields.float('Rounding'),
         'amount_untaxed': fields.float('Amount untaxed'),
         'amount_tax': fields.float('Amount tax'),
@@ -380,6 +412,15 @@ class account_invoice(orm.Model):
         #  1.6
         'sender': fields.selection(
             [('CC', 'assignee / partner'), ('TZ', 'third person')], 'Sender'),
+        
+        'ftpa_withholding_ids': fields.one2many(
+            'withholding.data.line', 'invoice_id',
+            'Withholding'
+            ),
+        'welfare_fund_ids': fields.one2many(
+            'welfare.fund.data.line', 'invoice_id',
+            'Welfare Fund'
+        ),
         #  2.1.1.1
         'doc_type': fields.many2one(
             'fatturapa.document_type', string="Document Type"),
@@ -398,11 +439,6 @@ class account_invoice(orm.Model):
         #  2.1.1.6
         'virtual_stamp': fields.boolean('Virtual Stamp'),
         'stamp_amount': fields.float('Stamp Amount'),
-        #  2.1.1.7
-        'welfare_fund_ids': fields.one2many(
-            'welfare.fund.data.line', 'invoice_id',
-            'Welfare Fund'
-        ),
         #  2.1.1.8
         'discount_rise_price_ids': fields.one2many(
             'discount.rise.price', 'invoice_id',
@@ -437,6 +473,10 @@ class account_invoice(orm.Model):
         'transport_date': fields.date('Transport Date'),
         'delivery_address': fields.text('Delivery Address'),
         'delivery_datetime': fields.datetime('Delivery Date Time'),
+        
+        
+        'ftpa_incoterms': fields.char(string="Incoterms", copy=False),
+
         #  2.1.10
         'related_invoice_code': fields.char('Related invoice code'),
         'related_invoice_date': fields.date('Related invoice date'),
@@ -459,7 +499,119 @@ class account_invoice(orm.Model):
             'fatturapa.attachments', 'invoice_id',
             'FatturaPA attachments'
         ),
+        
+    'efatt_stabile_organizzazione_indirizzo': fields.char(
+        string="Indirizzo Organizzazione",
+        help="Blocco da valorizzare nei casi di cedente / prestatore non "
+             "residente, con stabile organizzazione in Italia. Indirizzo "
+             "della stabile organizzazione in Italia (nome della via, piazza "
+             "etc.)",
+        readonly=True, copy=False),
+    'efatt_stabile_organizzazione_civico': fields.char(
+        string="Civico Organizzazione",
+        help="Numero civico riferito all'indirizzo (non indicare se gia' "
+             "presente nell'elemento informativo indirizzo)",
+        readonly=True, copy=False),
+    'efatt_stabile_organizzazione_cap': fields.char(
+        string="CAP Organizzazione",
+        help="Codice Avviamento Postale",
+        readonly=True, copy=False),
+    'efatt_stabile_organizzazione_comune': fields.char(
+        string="Comune Organizzazione",
+        help="Comune relativo alla stabile organizzazione in Italia",
+        readonly=True, copy=False),
+    'efatt_stabile_organizzazione_provincia': fields.char(
+        string="Provincia Organizzazione",
+        help="Sigla della provincia di appartenenza del comune indicato "
+             "nell'elemento informativo 1.2.3.4 <Comune>. Da valorizzare se "
+             "l'elemento informativo 1.2.3.6 <Nazione> e' uguale a IT",
+        readonly=True, copy=False),
+    'efatt_stabile_organizzazione_nazione': fields.char(
+        string="Nazione Organizzazione",
+        help="Codice della nazione espresso secondo lo standard "
+             "ISO 3166-1 alpha-2 code",
+        readonly=True, copy=False),
+    # 2.1.1.10
+    'efatt_rounding': fields.float(
+        "Arrotondamento", readonly=True,
+        help="Eventuale arrotondamento sul totale documento (ammette anche il "
+             "segno negativo)", copy=False
+    ),
+    'art73': fields.boolean(
+        'Art73', readonly=True,
+        help="Indica se il documento e' stato emesso secondo modalita' e "
+             "termini stabiliti con decreto ministeriale ai sensi "
+             "dell'articolo 73 del DPR 633/72 (cio' consente al "
+             "cedente/prestatore l'emissione nello stesso anno di piu' "
+             "documenti aventi stesso numero)", copy=False),
+    'electronic_invoice_subjected': fields.related('partner_id', 'electronic_invoice_subjected',
+                                                type='boolean', relation='res.partner',
+                                                string='Subjected to electronic invoice', readonly=True),
+    
     }
     _defaults = {
         'virtual_stamp': False
+    }
+
+    def copy(self, cr, uid, id, default=None, context=None):
+        default['fatturapa_attachment_out_id'] = False
+        ret_id = super(account_invoice, self).copy(cr, uid, id, default, context=context)
+        return ret_id
+
+class fatturapa_payment_term(orm.Model):
+    # _position = ['2.4.1']
+    _name = "fatturapa.payment_term"
+    _description = 'FatturaPA Payment Term'
+
+    _columns = {
+        'name': fields.char('Description', size=128),
+        'code': fields.char('Code', size=4),
+    }
+
+
+class fatturapa_payment_method(orm.Model):
+    # _position = ['2.4.2.2']
+    _name = "fatturapa.payment_method"
+    _description = 'FatturaPA Payment Method'
+
+    _columns = {
+        'name': fields.char('Description', size=128),
+        'code': fields.char('Code', size=4),
+    }
+
+#  used in fatturaPa export
+class account_payment_term(orm.Model):
+    # _position = ['2.4.2.2']
+    _inherit = 'account.payment.term'
+
+    _columns = {
+        'fatturapa_pt_id': fields.many2one(
+            'fatturapa.payment_term', string="FatturaPA Payment Term"),
+        'fatturapa_pm_id': fields.many2one(
+            'fatturapa.payment_method', string="FatturaPA Payment Method"),
+    }
+
+class WithholdingDataLine(orm.Model):
+    _name = "withholding.data.line"
+    _description = 'E-invoice Withholding Data'
+
+    _columns = {
+        'name': fields.selection(
+            selection=[
+                ('RT01', 'Natural Person'),
+                ('RT02', 'Legal Person'),
+                ('RT03', 'INPS'),
+                ('RT04', 'ENASARCO'),
+                ('RT05', 'ENPAM'),
+                ('RT06', 'OTHER'),
+            ],
+            string='Withholding Type'
+        ),
+        'amount': fields.float('Withholding amount'),
+        'rate': fields.float('Withholding rate'),
+        'reason': fields.char('Withholding reason'),
+        'invoice_id': fields.many2one(
+            'account.invoice', 'Related Invoice',
+            ondelete='cascade', index=True
+        ),
     }

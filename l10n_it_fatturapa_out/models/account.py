@@ -17,8 +17,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-
+from openerp.tools.translate import _
 from openerp.osv import fields, orm
+from openerp.osv.osv import except_osv
 
 
 class account_invoice(orm.Model):
@@ -26,6 +27,24 @@ class account_invoice(orm.Model):
 
     _columns = {
         'fatturapa_attachment_out_id': fields.many2one(
-            'fatturapa.attachment.out', 'FatturaPA Export File',
+            'fatturapa.attachment.out', 'E-invoice Export File',
             readonly=True),
+        'has_pdf_invoice_print': fields.related('fatturapa_attachment_out_id', 'has_pdf_invoice_print',
+                                                type='boolean', relation='fatturapa.attachment.out',
+                                                string='Has PDF invoice', readonly=True),
     }
+
+    def preventive_checks(self, cr, uid, ids, context={}):
+        # hook for preventive checks. Override and raise exception, in case
+        return
+
+    def action_invoice_cancel(self, cr, uid, ids, context={}):
+        for invoice in self.browse(cr, uid, ids, context):
+            if invoice.fatturapa_attachment_out_id:
+                raise except_osv(_('Error' ),
+                                 _(
+                    "Invoice %s has XML and can't be canceled. "
+                    "Delete the XML before"
+                ) % invoice.number)
+        res = super(account_invoice, self).action_invoice_cancel(cr, uid, ids, context)
+        return res

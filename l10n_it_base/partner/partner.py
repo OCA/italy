@@ -23,6 +23,7 @@
 
 from osv import osv
 from osv import fields
+import logging
 
 
 class res_region(osv.osv):
@@ -34,6 +35,8 @@ class res_region(osv.osv):
             required=True),
         'country_id': fields.many2one('res.country', 'Country'),
     }
+
+
 res_region()
 
 
@@ -49,6 +52,7 @@ class res_province(osv.osv):
             required=True),
         'region': fields.many2one('res.region', 'Region'),
     }
+
 
 res_province()
 
@@ -118,10 +122,13 @@ class res_partner(osv.osv):
                         vals['zip'] = city.zip
                     if city.province_id:
                         vals['province'] = city.province_id.id
-                    if city.region:
-                        vals['region'] = city.region.id
-                        if city.region.country_id:
-                            vals['country_id'] = city.region.country_id.id
+                    try:
+                        if city.region:
+                            vals['region'] = city.region.id
+                            if city.region.country_id:
+                                vals['country_id'] = city.region.country_id.id
+                    except Exception as ex:
+                        logging.error(ex)
         return vals
 
     def create(self, cr, uid, vals, context=None):

@@ -19,6 +19,7 @@
 ##############################################################################
 
 from openerp.osv import fields, orm
+from openerp.osv.osv import except_osv
 
 
 class res_company(orm.Model):
@@ -28,20 +29,37 @@ class res_company(orm.Model):
             'fatturapa.fiscal_position', 'Fiscal Position',
             help="Fiscal position used by FatturaPA",
             ),
-        'fatturapa_format_id': fields.many2one(
-            'fatturapa.format', 'Format',
-            help="FatturaPA Format",
+        'fatturapa_art73': fields.boolean('Art73'),
+        'fatturapa_pub_administration_ref': fields.char(
+            'Public Administration Reference Code', size=20,
             ),
+        'fatturapa_tax_representative': fields.many2one(
+            'res.partner', 'Legal Tax Representative'
+            ),
+        'fatturapa_sender_partner': fields.many2one(
+            'res.partner', 'Third Party/Sender'
+            ),
+        'fatturapa_stabile_organizzazione': fields.many2one(
+        'res.partner', 'Stabile Organizzazione',
+        help='Blocco da valorizzare nei casi di cedente / prestatore non '
+             'residente, con stabile organizzazione in Italia'
+        ),
         'fatturapa_sequence_id': fields.many2one(
             'ir.sequence', 'Sequence',
             help="il progressivo univoco del file è rappresentato da una "
                  "stringa alfanumerica di lunghezza massima di 5 caratteri "
                  "e con valori ammessi da “A” a “Z” e da “0” a “9”.",
-            ),
-        'fatturapa_art73': fields.boolean('Art73'),
-        'fatturapa_pub_administration_ref': fields.char(
-            'Public Administration Reference Code', size=20,
-            ),
+            ), 
+
+    'fatturapa_preview_style': fields.selection([
+        ('fatturaordinaria_v1.2.1.xsl', 'Fattura Ordinaria'),
+        ('FoglioStileAssoSoftware_v1.1.xsl', 'AssoSoftware')],
+        string='Preview Format Style', required=True,
+        ),
+        
+        
+        
+        # campi non presenti in V12
         'fatturapa_rea_office': fields.related(
             'partner_id', 'rea_office', type='many2one',
             relation='res.province', string='REA office'),
@@ -65,13 +83,27 @@ class res_company(orm.Model):
                 ('LN', 'Not in liquidation'),
                 ],
             string='Liquidation State'),
-        'fatturapa_tax_representative': fields.many2one(
-            'res.partner', 'Legal Tax Representative'
-            ),
-        'fatturapa_sender_partner': fields.many2one(
-            'res.partner', 'Third Party/Sender'
-            ),
+
+
     }
+
+    _defaults = {
+        'fatturapa_preview_style': 'fatturaordinaria_v1.2.1.xsl',
+        }
+
+    def _check_fatturapa_sequence_id(self, cr, uid, ids, context=None):
+        for company in self.browse(cr, uid, ids, context):
+            if company.fatturapa_sequence_id:
+                journal = self.pool.get('account.journal').search(cr, uid, [
+                    ('sequence_id', '=', company.fatturapa_sequence_id.id)
+                ], limit=1)
+                if journal:
+                    return False
+        return True
+
+    _constraints = [
+        (_check_fatturapa_sequence_id, 'Sequence already used by journal. Please select another one.', ['fatturapa_sequence_id']),
+    ]
 
 
 class account_config_settings(orm.TransientModel):
@@ -83,22 +115,6 @@ class account_config_settings(orm.TransientModel):
             relation="fatturapa.fiscal_position",
             string="Fiscal Position",
             help='Fiscal position used by FatturaPA'
-            ),
-        'fatturapa_format_id': fields.related(
-            'company_id', 'fatturapa_format_id',
-            type='many2one',
-            relation="fatturapa.format",
-            string="Format",
-            help='FatturaPA Format'
-            ),
-        'fatturapa_sequence_id': fields.related(
-            'company_id', 'fatturapa_sequence_id',
-            type='many2one',
-            relation="ir.sequence",
-            string="Sequence",
-            help="il progressivo univoco del file è rappresentato da una "
-                 "stringa alfanumerica di lunghezza massima di 5 caratteri "
-                 "e con valori ammessi da “A” a “Z” e da “0” a “9”.",
             ),
         'fatturapa_art73': fields.related(
             'company_id', 'fatturapa_art73',
@@ -118,31 +134,31 @@ class account_config_settings(orm.TransientModel):
             string="Public Administration Reference Code",
             ),
         'fatturapa_rea_office': fields.related(
-            'company_id', 'fatturapa_rea_office',
+            'company_id', 'partner_id', 'rea_office',
             type='many2one',
             relation="res.province",
             string="Rea Office",
             ),
         'fatturapa_rea_number': fields.related(
-            'company_id', 'fatturapa_rea_number',
+            'company_id', 'partner_id', 'rea_code',
             type='char',
             size=20,
             string="Rea Number",
             ),
         'fatturapa_rea_capital': fields.related(
-            'company_id', 'fatturapa_rea_capital',
+            'company_id', 'partner_id', 'rea_capital',
             type='float',
             string="Rea Capital",
             ),
         'fatturapa_rea_partner': fields.related(
-            'company_id', 'fatturapa_rea_partner',
+            'company_id', 'partner_id', 'rea_member_type',
             type='selection',
             selection=[('SU', 'Single Partner'),
                        ('SM', 'Many Partners')],
             string="Rea Copartner",
             ),
         'fatturapa_rea_liquidation': fields.related(
-            'company_id', 'fatturapa_rea_liquidation',
+            'company_id', 'partner_id', 'rea_liquidation_state',
             type='selection',
             selection=[('LN', 'Company Not in Liquidation'),
                        ('LS', 'Company In Liquidation')],
@@ -164,7 +180,41 @@ class account_config_settings(orm.TransientModel):
             help="Used when company sends invoices to a third party and they "
                  "send invoices to SDI"
             ),
+        
+        
+        
+        'fatturapa_stabile_organizzazione': fields.related(
+            'company_id', 'fatturapa_stabile_organizzazione',
+            type='many2one',
+            relation="res.partner",
+            string="Stabile Organizzazione",
+            help="Blocco da valorizzare nei casi di cedente / prestatore non "
+             "residente, con stabile organizzazione in Italia"
+            ),
+        'fatturapa_sequence_id': fields.related(
+            'company_id', 'fatturapa_sequence_id',
+            type='many2one',
+            relation="ir.sequence",
+            string="Sequence",
+            help="il progressivo univoco del file è rappresentato da una "
+                 "stringa alfanumerica di lunghezza massima di 5 caratteri "
+                 "e con valori ammessi da “A” a “Z” e da “0” a “9”.",
+            ),
+        
+        'fatturapa_preview_style': fields.related(
+            'company_id', 'fatturapa_preview_style',
+            type='selection',
+            selection=[
+        ('fatturaordinaria_v1.2.1.xsl', 'Fattura Ordinaria'),
+        ('FoglioStileAssoSoftware_v1.1.xsl', 'AssoSoftware')],
+            string="Preview Format Style",
+            required=True,
+            readonly=False,
+            ),
+        
+        
     }
+
 
     def onchange_company_id(self, cr, uid, ids, company_id, context=None):
         res = super(account_config_settings, self).onchange_company_id(
@@ -172,18 +222,19 @@ class account_config_settings(orm.TransientModel):
         if company_id:
             company = self.pool.get('res.company').browse(
                 cr, uid, company_id, context=context)
+            default_sequence = self.pool.get('ir.sequence').search(cr, uid, [
+                ('code', '=', 'account.invoice.fatturapa')
+            ])
+            default_sequence = (
+                default_sequence[0] if default_sequence else False)
             res['value'].update({
                 'fatturapa_fiscal_position_id': (
                     company.fatturapa_fiscal_position_id and
                     company.fatturapa_fiscal_position_id.id or False
                     ),
-                'fatturapa_format_id': (
-                    company.fatturapa_format_id and
-                    company.fatturapa_format_id.id or False
-                    ),
                 'fatturapa_sequence_id': (
                     company.fatturapa_sequence_id and
-                    company.fatturapa_sequence_id.id or False
+                    company.fatturapa_sequence_id.id or default_sequence
                     ),
                 'fatturapa_art73': (
                     company.fatturapa_art73 or False
@@ -215,11 +266,17 @@ class account_config_settings(orm.TransientModel):
                     company.fatturapa_sender_partner and
                     company.fatturapa_sender_partner.id or False
                     ),
+                'fatturapa_stabile_organizzazione': (
+                    company.fatturapa_stabile_organizzazione and
+                    company.fatturapa_stabile_organizzazione.id or False
+                    ),
+                'fatturapa_preview_style': (
+                    company.fatturapa_preview_style or False
+                    ),
                 })
         else:
             res['value'].update({
                 'fatturapa_fiscal_position_id': False,
-                'fatturapa_format_id': False,
                 'fatturapa_sequence_id': False,
                 'fatturapa_art73': False,
                 'fatturapa_pub_administration_ref': False,
@@ -230,5 +287,7 @@ class account_config_settings(orm.TransientModel):
                 'fatturapa_rea_liquidation': False,
                 'fatturapa_tax_representative': False,
                 'fatturapa_sender_partner': False,
+                'fatturapa_stabile_organizzazione': False,
+                'fatturapa_preview_style': 'fatturaordinaria_v1.2.1.xsl',
                 })
         return res

@@ -42,8 +42,9 @@ See l10n_it_fatturapa_out and l10n_it_fatturapa_in.
 Installation
 ============
 
-This module requires PyXB 1.2.4
+This module requires PyXB 1.2.6
 http://pyxb.sourceforge.net/
+http://github.com/OCA/partner-contact.git
 
 
 Configuration
@@ -68,6 +69,7 @@ Contributors
 * Lorenzo Battistini <lorenzo.battistini@agilebg.com>
 * Roberto Onnis <roberto.onnis@innoviu.com>
 * Alessio Gerace <alessio.gerace@agilebg.com>
+* Andrea Cometa <a.cometa@apuliasoftware.it>
 
 Maintainer
 ----------
@@ -93,20 +95,27 @@ To contribute to this module, please visit http://odoo-community.org.
         'l10n_it_ipa',
         'l10n_it_rea',
         'base_iban',
+        'partner_firstname',
+        'l10n_it_account_tax_kind',
         ],
 
     "data": [
         'data/fatturapa_data.xml',
+        'data/payment_term_data.xml',
         'data/welfare.fund.type.csv',
         'views/account_view.xml',
         'views/company_view.xml',
         'views/partner_view.xml',
         'views/account_tax_view.xml',
+        'views/related_document_type_views.xml',
         'security/ir.model.access.csv',
     ],
     "demo": ['demo/account_invoice_fatturapa.xml'],
     "installable": True,
     'external_dependencies': {
-        'python': ['pyxb'],
+        'python': [
+            'pyxb',  # pyxb 1.2.6
+            'asn1crypto'
+        ],
     }
 }
