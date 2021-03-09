@@ -195,7 +195,8 @@ class WizardExportFatturapa(models.TransientModel):
         Email = company.email
         fatturapa.FatturaElettronicaHeader.DatiTrasmissione. \
             ContattiTrasmittente = ContattiTrasmittenteType(
-            Telefono=Telefono or None, Email=Email or None)
+              Telefono=Telefono or None,
+              Email=Email or None)
 
         return True
 
