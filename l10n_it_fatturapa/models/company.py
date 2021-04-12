@@ -34,7 +34,7 @@ class ResCompany(models.Model):
         default='fatturaordinaria_v1.2.1.xsl')
 
     phone_electronic_invoice = fields.Char(
-      string="Phone for Electronic Invoice"
+        string="Phone for Electronic Invoice"
     )
 
 
