@@ -30,6 +30,7 @@ class WizardExportFatturapa(models.TransientModel):
     include_ddt_data = fields.Selection([
         ('dati_ddt', 'Include DDT Data'),
         ('dati_trasporto', 'Include transport data'),
+        ('descrizione_ddt', 'Includi DDT - Descrizione')
         ],
         string="DDT Data",
         help="Include DDT data: The field must be entered when a transport "
@@ -41,7 +42,14 @@ class WizardExportFatturapa(models.TransientModel):
     def setDatiDDT(self, invoice, body):
         res = super(WizardExportFatturapa, self).setDatiDDT(
             invoice, body)
-        if self.include_ddt_data == 'dati_ddt':
+        if self.include_ddt_data == 'descrizione_ddt':
+            for ddt in invoice.ftpa_related_ddts:
+                DatiDDT = DatiDDTType(
+                    NumeroDDT=ddt.name,
+                    DataDDT=ddt.date
+                )
+                body.DatiGenerali.DatiDDT.append(DatiDDT)
+        elif  self.include_ddt_data == 'dati_ddt':
             inv_lines_by_ddt = {}
             for line in invoice.invoice_line_ids:
                 if (
