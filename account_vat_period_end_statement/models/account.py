@@ -28,6 +28,7 @@ from odoo.tools.translate import _
 from odoo.exceptions import UserError
 import odoo.addons.decimal_precision as dp
 from odoo.tools import float_is_zero
+from odoo.tools.float_utils import float_compare
 
 
 class AccountVatPeriodEndStatement(models.Model):
@@ -69,17 +70,17 @@ class AccountVatPeriodEndStatement(models.Model):
     def _compute_residual(self):
         precision = self.env.user.company_id.currency_id.decimal_places
         for statement in self:
+            if not statement.move_id.exists():
+                statement.residual = 0.0
+                statement.reconciled = False
+                continue
+
             residual = 0.0
-            if statement.move_id.exists():
-                if not statement.move_id:
-                    statement.residual = 0.0
-                    statement.reconciled = False
-                    return
-                for line in statement.move_id.line_ids:
-                    authority_vat_account_id = (
-                        statement.authority_vat_account_id.id)
-                    if line.account_id.id == authority_vat_account_id:
-                        residual += line.amount_residual
+            for line in statement.move_id.line_ids:
+                authority_vat_account_id = (
+                    statement.authority_vat_account_id.id)
+                if line.account_id.id == authority_vat_account_id:
+                    residual += line.amount_residual
             statement.residual = abs(residual)
             if float_is_zero(statement.residual, precision_digits=precision):
                 statement.reconciled = True
@@ -499,7 +500,7 @@ class AccountVatPeriodEndStatement(models.Model):
 
     @api.multi
     def compute_amounts(self):
-        decimal_precision_obj = self.env['decimal.precision']
+        prec = self.env['decimal.precision'].precision_get('Account')
         debit_line_model = self.env['statement.debit.account.line']
         credit_line_model = self.env['statement.credit.account.line']
         for statement in self:
@@ -508,12 +509,20 @@ class AccountVatPeriodEndStatement(models.Model):
                 [('date', '<', statement.date)], order='date desc')
             if prev_statements:
                 prev_statement = prev_statements[0]
-                if (
-                    prev_statement.residual > 0 and
-                    prev_statement.authority_vat_amount > 0
-                ):
+                if float_compare(
+                    prev_statement.authority_vat_amount, 0, precision_digits=prec
+                ) > 0:
+                    prev_debit_vat_amount = prev_statement.authority_vat_amount
+                    authority_vat_account = statement.authority_vat_account_id
+                    move_lines = self.env['account.move.line'].search(
+                        [('account_id', '=', authority_vat_account.id),
+                         ('date', '>', prev_statement.date),
+                         ('date', '<=', statement.date)]
+                    )
+                    for line in move_lines:
+                        prev_debit_vat_amount -= line.amount_residual
                     statement.write(
-                        {'previous_debit_vat_amount': prev_statement.residual})
+                        {'previous_debit_vat_amount': prev_debit_vat_amount})
                 elif prev_statement.authority_vat_amount < 0:
                     statement.write(
                         {'previous_credit_vat_amount': (
@@ -543,8 +552,7 @@ class AccountVatPeriodEndStatement(models.Model):
             if statement.interest and statement.authority_vat_amount > 0:
                 interest_amount = round(
                     statement.authority_vat_amount *
-                    (float(statement.interest_percent) / 100),
-                    decimal_precision_obj.precision_get('Account'))
+                    (float(statement.interest_percent) / 100), prec)
             # Add line with interest
             if interest_amount:
                 statement.interests_debit_vat_account_id = acc_id
