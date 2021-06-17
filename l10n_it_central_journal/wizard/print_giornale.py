@@ -7,7 +7,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import Warning as UserError
 from datetime import datetime, timedelta
-from odoo.tools.misc import flatten
+from odoo.osv import expression
 
 
 class WizardGiornale(models.TransientModel):
@@ -96,23 +96,15 @@ class WizardGiornale(models.TransientModel):
             target_type = ['posted', 'draft']
         else:
             target_type = [wizard.target_move]
-        sql = """
-            SELECT aml.id FROM account_move_line aml
-            LEFT JOIN account_move am ON (am.id = aml.move_id)
-            WHERE
-            aml.date >= %(date_from)s
-            AND aml.date <= %(date_to)s
-            AND am.state in %(target_type)s
-            ORDER BY am.date, am.name
-        """
-        params = {
-            'date_from': wizard.date_move_line_from,
-            'date_to': wizard.date_move_line_to,
-            'target_type': tuple(target_type)
-            }
-        self.env.cr.execute(sql, params)
-        res = self.env.cr.fetchall()
-        move_line_ids = flatten(res)
+        domains = [
+            [('move_id.state', 'in', target_type)],
+            [('date', '>=', wizard.date_move_line_from)],
+            [('date', '<=', wizard.date_move_line_to)]
+        ]
+        domain = expression.AND(domains)
+        move_line_ids = self.env['account.move.line'].search(
+            domain, order='date, move_name'
+        ).ids
         return move_line_ids
 
     def _prepare_datas_form(self):

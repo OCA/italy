@@ -8,6 +8,12 @@ from odoo import models, fields
 import odoo.addons.decimal_precision as dp
 
 
+class AccountMoveLine(models.Model):
+    _inherit = "account.move.line"
+
+    move_name = fields.Char(related='move_id.name', string='Label', index=True, store=True, copy=False)
+
+
 class AccountJournalInherit(models.Model):
     _inherit = "account.journal"
 
