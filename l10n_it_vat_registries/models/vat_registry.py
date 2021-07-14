@@ -141,6 +141,10 @@ class ReportRegistroIva(models.AbstractModel):
         # index è usato per non ripetere la stampa dei dati fattura quando ci
         # sono più codici IVA
         index = 0
+        if 'in' in move.move_type:
+            reference = (move and move.payment_reference or "")
+        else:
+            reference = (move and move.name or "")
         if "refund" in move.move_type:
             invoice_type = "NC"
         else:
@@ -161,7 +165,7 @@ class ReportRegistroIva(models.AbstractModel):
                 "index": index,
                 "invoice_type": invoice_type,
                 "invoice_date": (move and move.invoice_date or move.date or ""),
-                "reference": (move and move.name or ""),
+                "reference": reference,
                 # These 4 items are added to make the dictionary more usable
                 # in further customizations, allowing inheriting modules to
                 # retrieve the records that have been used to create the
@@ -193,7 +197,7 @@ class ReportRegistroIva(models.AbstractModel):
         if receivable_payable_found:
             total = abs(total)
         else:
-            total = abs(move.amount)
+            total = abs(move.amount_total)
         if "refund" in move.move_type:
             total = -total
         return total
