@@ -115,11 +115,6 @@ class AccountConfigSettings(models.TransientModel):
         readonly=False
         )
 
-    phone_electronic_invoice = fields.Char(
-        related='company_id.phone_electronic_invoice',
-        readonly=False,
-    )
-
     @api.onchange('company_id')
     def onchange_company_id(self):
         if self.company_id:
